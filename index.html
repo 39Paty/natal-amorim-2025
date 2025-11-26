@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Contribuição de Natal Local</title>
+    <title>Lista de Contribuição de Natal Colaborativa</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -46,39 +46,82 @@
         <!-- Cabeçalho -->
         <header class="header-bg p-6 rounded-t-xl mb-6 -mx-6 -mt-6 sm:-mx-8 sm:-mt-8 lg:-mx-10 lg:-mt-10">
             <h1 class="text-3xl font-bold text-center">🎄 Natal da Família Amorim 🎄</h1>
-            <p class="text-center mt-2 opacity-90">Escolha o que você vai levar!</p>
+            <p class="text-center mt-2 opacity-90">Escolha o que você vai levar! (MODO COLABORATIVO)</p>
         </header>
 
-        <!-- AVISO DE MODO LOCAL -->
-        <div class="mb-4 p-4 bg-red-100 border border-red-400 rounded-lg">
-            <p class="text-sm font-bold text-red-800">ATENÇÃO: MODO DE RESERVA LOCAL</p>
-            <p class="text-xs text-red-700 mt-1">As reservas são salvas apenas neste navegador e não são compartilhadas com outras pessoas.</p>
-        </div>
-
-        <!-- Input de Nome do Usuário (Chave de Reserva) -->
+        <!-- Informações e Input de Nome do Usuário -->
         <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between">
-            <p class="text-sm font-medium text-red-800 mb-2 sm:mb-0 mr-4">Seu Nome para a Reserva:</p>
-            <input id="user-name-input" type="text" placeholder="Digite seu nome (ex: João)"
-                   class="p-2 border border-red-300 rounded-lg w-full sm:w-1/2 text-red-900 focus:ring-red-500 focus:border-red-500"
-                   oninput="saveUserName(this.value)">
+            <div class="flex-grow mb-2 sm:mb-0">
+                <p class="text-sm font-medium text-red-800">1. Digite seu nome (usado na reserva):</p>
+                <!-- Usamos localStorage para lembrar o nome apenas neste navegador -->
+                <input id="user-name-input" type="text" placeholder="Seu Nome (ex: Maria)"
+                       class="p-2 border border-red-300 rounded-lg w-full sm:w-64 mt-1 text-red-900 focus:ring-red-500 focus:border-red-500"
+                       oninput="saveUserName(this.value)">
+            </div>
+            <div class="mt-3 sm:mt-0 sm:ml-4">
+                <p class="text-sm font-medium text-red-800">2. Seu ID de Sessão (Para Diagnóstico):</p>
+                <p id="user-id-display" class="font-mono text-xs break-all mt-1 text-red-900">Aguardando...</p>
+            </div>
         </div>
 
         <!-- Lista de Itens -->
-        <div id="loading-indicator" class="text-center py-8 text-gray-500 hidden">Carregando a lista...</div>
-        <div id="item-list-container" class="scroll-container space-y-3">
+        <div id="loading-indicator" class="text-center py-8 text-gray-500">Carregando a lista...</div>
+        <div id="item-list-container" class="scroll-container space-y-3 hidden">
             <!-- Os itens serão injetados aqui pelo JavaScript -->
         </div>
 
+        <!-- Painel de Erro CRÍTICO (BD Offline) -->
+        <div id="critical-error-message" class="mt-6 p-4 hidden bg-red-100 border-2 border-red-500 text-red-700 rounded-lg" role="alert">
+            <p class="font-bold text-red-900">ERRO CRÍTICO: BANCO DE DADOS OFFLINE</p>
+            <p id="critical-error-text" class="text-sm mt-1"></p>
+            <!-- Botão de Recarga Forçada -->
+            <button onclick="window.location.reload(true)" 
+                    class="mt-4 px-6 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition duration-150 shadow-md">
+                Tentar Recarregar e Forçar a Conexão
+            </button>
+        </div>
+        
     </div>
 </div>
 
+<!-- Firebase SDKs -->
 <script type="module">
-    // Define a chave de armazenamento local
-    const LOCAL_STORAGE_KEY_ITEMS = 'natalListItems';
+    // Importações necessárias do Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, onSnapshot, collection, writeBatch, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Define a chave de armazenamento local para o nome do usuário
     const LOCAL_STORAGE_KEY_NAME = 'natalUserName';
 
-    // --- 1. Definições Iniciais ---
+    // Oculta a lista inicialmente
+    document.getElementById('item-list-container').classList.add('hidden');
+    
+    // Variáveis globais (fornecidas pelo ambiente)
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    
+    // Lendo e parseando a configuração do Firebase (com tratamento de erro)
+    const firebaseConfigString = typeof __firebase_config !== 'undefined' && __firebase_config ? __firebase_config : '{}';
+    let firebaseConfig;
+    try {
+        firebaseConfig = JSON.parse(firebaseConfigString);
+    } catch (e) {
+        console.error("Falha ao analisar a configuração do Firebase (JSON inválido).", e);
+        firebaseConfig = {};
+    }
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
+    // Configuração e inicialização do Firebase
+    let app;
+    let db;
+    let auth;
+    let userId = 'static-user'; 
+    let isAuthReady = false;
+    let canUseFirestore = true; 
+    
+    // Caminho da coleção pública para a lista de Natal
+    const COLLECTION_PATH = `artifacts/${appId}/public/data/natal_list`;
+    
     // Define a ordem e as notas especiais para as categorias
     const CATEGORIES_INFO = [
         { name: "Comida Principal", note: "" },
@@ -87,7 +130,7 @@
         { name: "Frutas", note: "Essa é para os machos alfas da família. 😏" },
     ];
 
-    // Itens Iniciais da Lista (Fallback se o Local Storage estiver vazio)
+    // Itens Iniciais da Lista (Usado como fallback estático)
     const INITIAL_ITEMS = [
         // Comida Principal
         { name: "Bolinho de Bacalhau", category: "Comida Principal", takenBy: null },
@@ -120,7 +163,6 @@
         { name: "Panetone + 1 pc de copo 200ml", category: "Sobremesas", takenBy: null },
         { name: "Surpresa de Morango + 1 pc de garfinho", category: "Sobremesas", takenBy: null },
         { name: "Surpresa de Uva + 1 pc de guardanapo", category: "Sobremesas", takenBy: null },
-        { name: "Pudim (g)", category: "Sobremesas", takenBy: null },
         
         // Frutas
         { name: "Uvas", category: "Frutas", takenBy: null },
@@ -131,38 +173,6 @@
         { name: "Melancia", category: "Frutas", takenBy: null },
         { name: "Melão", category: "Frutas", takenBy: null },
     ];
-
-    // --- 2. Funções de Local Storage e Estado ---
-
-    /**
-     * Carrega a lista de itens do Local Storage ou retorna a lista inicial.
-     * @returns {Array} Lista de itens.
-     */
-    function loadItems() {
-        try {
-            const storedItems = localStorage.getItem(LOCAL_STORAGE_KEY_ITEMS);
-            if (storedItems) {
-                return JSON.parse(storedItems);
-            }
-        } catch (e) {
-            console.error("Erro ao carregar do Local Storage, usando lista inicial.", e);
-        }
-        // Quando o Local Storage está vazio, usamos os itens iniciais
-        return INITIAL_ITEMS.map(item => ({ ...item, id: item.name }));
-    }
-
-    /**
-     * Salva a lista de itens no Local Storage.
-     * @param {Array} items Lista de itens a serem salvos.
-     */
-    function saveItems(items) {
-        try {
-            localStorage.setItem(LOCAL_STORAGE_KEY_ITEMS, JSON.stringify(items));
-        } catch (e) {
-            console.error("Erro ao salvar no Local Storage.", e);
-            alert("Erro: Não foi possível salvar sua reserva no navegador.");
-        }
-    }
 
     /**
      * Carrega o nome do usuário do Local Storage.
@@ -180,58 +190,154 @@
         localStorage.setItem(LOCAL_STORAGE_KEY_NAME, name);
     }
     
-    // --- 3. Manipulação de Ações e Renderização ---
-
     /**
-     * Manipula a reserva ou liberação de um item.
-     * @param {string} itemId O nome/ID do item.
-     * @param {string} action 'take' ou 'release'.
+     * Exibe a mensagem de erro crítico (BD Offline).
+     * @param {string} message A mensagem de erro específica.
      */
-    function handleItemAction(itemId, action) {
-        const userName = loadUserName().trim();
+    function showCriticalError(message) {
+        canUseFirestore = false;
+        document.getElementById('loading-indicator').classList.add('hidden');
+        document.getElementById('item-list-container').classList.add('hidden');
         
-        if (!userName) {
+        const errorDiv = document.getElementById('critical-error-message');
+        document.getElementById('critical-error-text').textContent = message;
+        errorDiv.classList.remove('hidden');
+        
+        // Renderiza a lista estática para que o usuário veja algo
+        renderList(INITIAL_ITEMS); 
+    }
+
+    // --- 1. Inicialização do Firebase e Autenticação ---
+    try {
+        // Verifica se a configuração está ausente (Causa raiz do BD Offline)
+        if (Object.keys(firebaseConfig).length === 0) {
+            showCriticalError("O ambiente de desenvolvimento não injetou as configurações do Firebase. As reservas não serão salvas globalmente. Por favor, clique no botão abaixo.");
+            throw new Error("Configurações do Firebase ausentes.");
+        }
+        
+        // Se as configurações existirem, inicia o Firebase
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        // Carrega o nome do usuário e preenche o input
+        const userNameInput = document.getElementById('user-name-input');
+        userNameInput.value = loadUserName();
+
+        // Observa o estado de autenticação
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                document.getElementById('user-id-display').textContent = userId;
+                isAuthReady = true;
+                
+                // Remove o erro se a autenticação for bem-sucedida
+                document.getElementById('critical-error-message').classList.add('hidden');
+
+                // Após a autenticação, inicializamos a lista se necessário e começamos a ouvir
+                await initializeList();
+                startRealtimeListener();
+            } else {
+                // Se não estiver logado, tenta autenticar
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            }
+        });
+
+    } catch (error) {
+        // Se for o erro de ausência de config, o showCriticalError já cuidou
+        if (!error.message.includes("Configurações do Firebase ausentes")) {
+             console.error("Erro ao inicializar Firebase:", error);
+             showCriticalError(`Erro ao iniciar o banco de dados. ${error.message || 'Verifique o console para detalhes.'}`);
+        }
+    }
+
+    // --- 2. Lógica do Firestore ---
+
+    // Inicializa a lista se ela estiver vazia no banco de dados
+    async function initializeList() {
+        if (!isAuthReady || !canUseFirestore) return;
+
+        try {
+            const listCollectionRef = collection(db, COLLECTION_PATH);
+            const querySnapshot = await getDocs(listCollectionRef);
+
+            if (querySnapshot.empty) {
+                const batch = writeBatch(db);
+
+                INITIAL_ITEMS.forEach(item => {
+                    const itemDocRef = doc(db, COLLECTION_PATH, item.name);
+                    // Garante que o takenBy é um objeto nulo no início
+                    batch.set(itemDocRef, { ...item, takenBy: null });
+                });
+
+                await batch.commit();
+            }
+        } catch (error) {
+            console.error("Erro ao inicializar a lista:", error);
+            showCriticalError("Falha ao inicializar a lista. Verifique as regras de segurança do Firestore.");
+        }
+    }
+
+    // Manipulador para tirar ou liberar um item
+    async function handleItemAction(itemId, action) {
+        if (!canUseFirestore) {
+            alert("O banco de dados está offline. Por favor, use o botão 'Recarregar' no alerta vermelho.");
+            return;
+        }
+
+        if (!isAuthReady || !userId) {
+            alert("Aguarde a autenticação ser concluída.");
+            return;
+        }
+
+        const userName = loadUserName().trim();
+        if (action === 'take' && !userName) {
             alert("Por favor, digite seu nome no campo acima antes de reservar um item.");
             document.getElementById('user-name-input').focus();
             return;
         }
 
-        let items = loadItems();
-        const itemIndex = items.findIndex(item => item.name === itemId);
-
-        if (itemIndex > -1) {
-            if (action === 'take') {
-                // Tenta reservar se estiver livre ou reservado pelo próprio usuário
-                if (items[itemIndex].takenBy === null || items[itemIndex].takenBy === userName) {
-                    items[itemIndex].takenBy = userName;
-                } else {
-                    alert(`Item já reservado por: ${items[itemIndex].takenBy}.`);
-                    return;
-                }
-            } else if (action === 'release') {
-                // Libera se estiver reservado pelo próprio usuário
-                if (items[itemIndex].takenBy === userName) {
-                    items[itemIndex].takenBy = null;
-                }
-            }
-            saveItems(items);
-            renderList(items); // Re-renderiza a lista
+        const itemDocRef = doc(db, COLLECTION_PATH, itemId);
+        
+        let newTakenBy;
+        if (action === 'take') {
+            // Nova estrutura: objeto com ID e nome real
+            newTakenBy = { id: userId, name: userName }; 
+        } else {
+            newTakenBy = null;
+        }
+        
+        try {
+            await updateDoc(itemDocRef, {
+                takenBy: newTakenBy
+            });
+        } catch (error) {
+            console.error("Erro ao atualizar o item:", error);
+            alert(`Falha ao ${action === 'take' ? 'reservar' : 'liberar'} o item. O item pode já ter sido reservado.`);
         }
     }
+
+    // --- 3. Renderização e Sincronização em Tempo Real ---
 
     // Renderiza a lista no DOM
     function renderList(items) {
         const listContainer = document.getElementById('item-list-container');
-        listContainer.innerHTML = ''; // Limpa o conteúdo anterior
-        const userName = loadUserName().trim();
+        listContainer.innerHTML = ''; 
+        
+        const currentUserId = userId; // O ID de quem está vendo a tela
 
         // 1. Agrupa os itens por categoria
         const groupedItems = items.reduce((acc, item) => {
-            const category = item.category || 'Outros';
+            const category = item.category || 'Outros'; 
             if (!acc[category]) {
                 acc[category] = [];
             }
-            acc[category].push(item);
+            // Adiciona o ID do documento, que é o nome do item
+            acc[category].push({ id: item.name, ...item });
             return acc;
         }, {});
 
@@ -241,7 +347,7 @@
             const categoryNote = categoryInfo.note;
             const categoryItems = groupedItems[categoryName] || [];
 
-            if (categoryItems.length === 0) return;
+            if (categoryItems.length === 0) return; 
 
             // Título da Categoria
             const titleDiv = document.createElement('div');
@@ -268,16 +374,21 @@
                 const aTaken = a.takenBy !== null;
                 const bTaken = b.takenBy !== null;
                 if (aTaken === bTaken) return 0;
-                return aTaken ? 1 : -1;
+                return aTaken ? 1 : -1; 
             });
+
 
             // Renderiza os itens da categoria
             categoryItems.forEach(item => {
-                const itemId = item.name;
-
-                const isTaken = item.takenBy !== null;
-                const isMine = isTaken && item.takenBy === userName;
-                const takenByDisplay = item.takenBy || 'Disponível';
+                const itemId = item.id;
+                
+                // Adaptação para a nova estrutura de takenBy
+                const isTaken = item.takenBy !== null && typeof item.takenBy === 'object' && item.takenBy.id;
+                const takerId = isTaken ? item.takenBy.id : null;
+                const takerName = isTaken ? item.takenBy.name : null;
+                
+                const isMine = isTaken && takerId === currentUserId;
+                const takenByDisplay = isMine ? 'Você' : takerName || 'ID Desconhecido'; 
 
                 const itemDiv = document.createElement('div');
                 itemDiv.className = `flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl shadow-md ${isTaken ? 'list-item-taken' : 'list-item-free'} transition-colors duration-300`;
@@ -293,10 +404,8 @@
                 const statusEl = document.createElement('p');
                 statusEl.className = `text-sm mt-0.5 ${isTaken ? 'text-green-800' : 'text-red-600'}`;
                 
-                if (isMine) {
-                    statusEl.innerHTML = `<span class="font-bold text-green-900">Reservado por VOCÊ!</span>`;
-                } else if (isTaken) {
-                    statusEl.innerHTML = `Reservado por: <span class="font-mono font-bold">${takenByDisplay}</span>`;
+                if (isTaken) {
+                     statusEl.innerHTML = `Reservado por: <span class="font-mono font-bold">${takenByDisplay}</span>`;
                 } else {
                     statusEl.textContent = 'Disponível';
                 }
@@ -309,16 +418,23 @@
                 const actionButton = document.createElement('button');
                 actionButton.className = 'w-full sm:w-auto px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 transform';
                 
-                // Lógica de botão para o Modo Local
-                if (isMine) {
+                if (!canUseFirestore) {
+                    // MODO ESTÁTICO DE EMERGÊNCIA
+                    actionButton.textContent = 'BD Offline';
+                    actionButton.className += ' bg-gray-400 text-gray-700 cursor-not-allowed';
+                    actionButton.disabled = true;
+                } else if (isMine) {
+                    // Botão para liberar o item (se foi tirado por mim)
                     actionButton.textContent = 'Liberar';
                     actionButton.className += ' bg-yellow-600 text-white hover:bg-yellow-700 focus:outline-none focus:ring-4 focus:ring-yellow-300 hover:scale-105';
                     actionButton.onclick = () => handleItemAction(itemId, 'release');
                 } else if (isTaken) {
+                    // Item tirado por outra pessoa - desabilitado
                     actionButton.textContent = 'Reservado';
                     actionButton.className += ' bg-gray-400 text-gray-700 cursor-not-allowed';
                     actionButton.disabled = true;
                 } else {
+                    // Item disponível - botão para tirar
                     actionButton.textContent = 'Eu Levo!';
                     actionButton.className += ' bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 hover:scale-105';
                     actionButton.onclick = () => handleItemAction(itemId, 'take');
@@ -328,33 +444,35 @@
                 listContainer.appendChild(itemDiv);
             });
         });
+
+        document.getElementById('loading-indicator').classList.add('hidden');
+        document.getElementById('item-list-container').classList.remove('hidden');
     }
-    
-    // --- 4. Inicialização da Aplicação ---
-    
-    /**
-     * Função principal de inicialização da lista.
-     */
-    function initList() {
-        const userNameInput = document.getElementById('user-name-input');
-        const savedName = loadUserName();
+
+    // Inicia o ouvinte em tempo real do Firestore
+    function startRealtimeListener() {
+        if (!isAuthReady || !canUseFirestore) return;
+
+        const listCollectionRef = collection(db, COLLECTION_PATH);
         
-        // 1. Carrega e exibe o nome salvo
-        if (savedName) {
-            userNameInput.value = savedName;
-        }
+        // onSnapshot nos dá a atualização em tempo real
+        onSnapshot(listCollectionRef, (snapshot) => {
+            const items = [];
+            snapshot.forEach((doc) => {
+                items.push({ name: doc.id, ...doc.data() });
+            });
+            
+            renderList(items);
 
-        // 2. Carrega os itens e renderiza
-        const items = loadItems();
-        renderList(items);
-
-        // 3. Adiciona a função ao escopo global para o HTML
-        window.handleItemAction = handleItemAction;
-        window.saveUserName = saveUserName;
+        }, (error) => {
+            console.error("Erro ao ouvir a coleção em tempo real:", error);
+            showCriticalError("Erro na sincronização. Os dados não estão atualizando. Tente recarregar.");
+        });
     }
 
-    // Inicia a aplicação após o carregamento
-    window.onload = initList;
+    // Adiciona as funções ao escopo global para o HTML
+    window.handleItemAction = handleItemAction;
+    window.saveUserName = saveUserName;
 </script>
 </body>
 </html>
