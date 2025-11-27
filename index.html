@@ -46,7 +46,7 @@
         <!-- Cabeçalho -->
         <header class="header-bg p-6 rounded-t-xl mb-6 -mx-6 -mt-6 sm:-mx-8 sm:-mt-8 lg:-mx-10 lg:-mt-10">
             <h1 class="text-3xl font-bold text-center">🎄 Natal da Família Amorim 🎄</h1>
-            <p class="text-center mt-2 opacity-90">Escolha o que você vai levar! (MODO COLABORATIVO)</p>
+            <p class="text-center mt-2 opacity-90">Escolha o que você vai levar!</p>
         </header>
 
         <!-- Informações e Input de Nome do Usuário -->
@@ -87,7 +87,10 @@
 <!-- Firebase SDKs -->
 <script type="module">
     // Importações necessárias do Firebase
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { initializeApp } from "firebase/app";
+    import { getAnalytics } from "firebase/analytics";
+    // TODO: Add SDKs for Firebase products that you want to use
+    // https://firebase.google.com/docs/web/setup#available-libraries
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, onSnapshot, collection, writeBatch, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -118,6 +121,22 @@
     let userId = 'static-user'; 
     let isAuthReady = false;
     let canUseFirestore = true; 
+
+    // Your web app's Firebase configuration
+    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+    const firebaseConfig = {
+        apiKey: "AIzaSyDX2gZUs1G4hwJIsG57zSgQfu3dCTRMPDs",
+        authDomain: "natal-em-familia.firebaseapp.com",
+        projectId: "natal-em-familia",
+        storageBucket: "natal-em-familia.firebasestorage.app",
+        messagingSenderId: "632346896920",
+        appId: "1:632346896920:web:85c864f931c94c3e66b16d",
+        measurementId: "G-XZ703RD9DC"
+        };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
     
     // Caminho da coleção pública para a lista de Natal
     const COLLECTION_PATH = `artifacts/${appId}/public/data/natal_list`;
