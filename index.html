@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -46,8 +46,19 @@
         <!-- Cabeçalho -->
         <header class="header-bg p-6 rounded-t-xl mb-6 -mx-6 -mt-6 sm:-mx-8 sm:-mt-8 lg:-mx-10 lg:-mt-10">
             <h1 class="text-3xl font-bold text-center">🎄 Natal da Família Amorim 🎄</h1>
-            <p class="text-center mt-2 opacity-90">Escolha o que você vai levar!</p>
+            <p class="text-center mt-2 opacity-90">Escolha o que você vai levar! (MODO COLABORATIVO)</p>
         </header>
+        
+        <!-- Painel de Erro CRÍTICO (BD Offline) -->
+        <div id="critical-error-message" class="mt-6 p-4 hidden bg-red-100 border-2 border-red-500 text-red-700 rounded-lg mb-6" role="alert">
+            <p class="font-bold text-red-900">ERRO CRÍTICO: BANCO DE DADOS OFFLINE</p>
+            <p id="critical-error-text" class="text-sm mt-1">Detalhe: Ocorreu um erro na conexão. Tente recarregar ou verifique as regras de segurança do Firestore.</p>
+            <!-- Botão de Recarga Forçada -->
+            <button onclick="window.location.reload(true)" 
+                    class="mt-4 px-6 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition duration-150 shadow-md">
+                Tentar Recarregar e Forçar a Conexão
+            </button>
+        </div>
 
         <!-- Informações e Input de Nome do Usuário -->
         <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between">
@@ -59,38 +70,30 @@
                        oninput="saveUserName(this.value)">
             </div>
             <div class="mt-3 sm:mt-0 sm:ml-4">
-                <p class="text-sm font-medium text-red-800">2. Seu ID de Sessão (Para Diagnóstico):</p>
-                <p id="user-id-display" class="font-mono text-xs break-all mt-1 text-red-900">Aguardando...</p>
+                <p class="text-sm font-medium text-red-800">2. Status da Conexão:</p>
+                <p id="auth-status-display" class="font-mono text-sm mt-1 text-red-900">Conectando...</p>
+                <p id="user-id-display" class="font-mono text-xs break-all text-red-900 hidden"></p>
             </div>
         </div>
 
         <!-- Lista de Itens -->
-        <div id="loading-indicator" class="text-center py-8 text-gray-500">Carregando a lista...</div>
+        <div id="loading-indicator" class="text-center py-8 text-gray-500 font-semibold text-xl">Carregando a lista...</div>
         <div id="item-list-container" class="scroll-container space-y-3 hidden">
             <!-- Os itens serão injetados aqui pelo JavaScript -->
         </div>
 
-        <!-- Painel de Erro CRÍTICO (BD Offline) -->
-        <div id="critical-error-message" class="mt-6 p-4 hidden bg-red-100 border-2 border-red-500 text-red-700 rounded-lg" role="alert">
-            <p class="font-bold text-red-900">ERRO CRÍTICO: BANCO DE DADOS OFFLINE</p>
-            <p id="critical-error-text" class="text-sm mt-1"></p>
-            <!-- Botão de Recarga Forçada -->
-            <button onclick="window.location.reload(true)" 
-                    class="mt-4 px-6 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition duration-150 shadow-md">
-                Tentar Recarregar e Forçar a Conexão
-            </button>
-        </div>
-        
     </div>
+</div>
+
+<!-- Painel de Mensagens Flutuantes (Toast-like) -->
+<div id="floating-message" class="fixed bottom-5 right-5 z-50 p-4 rounded-lg text-white shadow-xl transition-all duration-300 opacity-0 transform translate-y-full pointer-events-none" role="alert">
+    <!-- Message content goes here -->
 </div>
 
 <!-- Firebase SDKs -->
 <script type="module">
     // Importações necessárias do Firebase
-    import { initializeApp } from "firebase/app";
-    import { getAnalytics } from "firebase/analytics";
-    // TODO: Add SDKs for Firebase products that you want to use
-    // https://firebase.google.com/docs/web/setup#available-libraries
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, onSnapshot, collection, writeBatch, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -100,46 +103,41 @@
     // Oculta a lista inicialmente
     document.getElementById('item-list-container').classList.add('hidden');
     
-    // Variáveis globais (fornecidas pelo ambiente)
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    
-    // Lendo e parseando a configuração do Firebase (com tratamento de erro)
-    const firebaseConfigString = typeof __firebase_config !== 'undefined' && __firebase_config ? __firebase_config : '{}';
+    // ===================================================================================
+    // === CONFIGURAÇÕES DO FIREBASE (FORNECIDAS PELO AMBIENTE) ===
+    // ===================================================================================
     let firebaseConfig;
-    try {
-        firebaseConfig = JSON.parse(firebaseConfigString);
-    } catch (e) {
-        console.error("Falha ao analisar a configuração do Firebase (JSON inválido).", e);
-        firebaseConfig = {};
-    }
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    let initialAuthToken;
+    let appId = 'default-app-id'; 
 
-    // Configuração e inicialização do Firebase
+    const authStatusEl = document.getElementById('auth-status-display');
+    const userIdEl = document.getElementById('user-id-display');
+
+    try {
+        firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        appId = typeof __app_id !== 'undefined' ? __app_id : appId; 
+
+        if (Object.keys(firebaseConfig).length === 0) {
+             throw new Error("A configuração do Firebase não foi fornecida pelo ambiente.");
+        }
+    } catch (e) {
+        console.error("Erro ao carregar a configuração do Firebase:", e);
+        showCriticalError(`Erro de inicialização: ${e.message}. Verifique a configuração base.`);
+    }
+    
+    // Nome da coleção no Firestore. 
+    const COLLECTION_BASE_NAME = `natal_list_items`;
+    const COLLECTION_PATH = `artifacts/${appId}/public/data/${COLLECTION_BASE_NAME}`;
+    // ===================================================================================
+    
+    // Variáveis de inicialização do Firebase e estado
     let app;
     let db;
     let auth;
     let userId = 'static-user'; 
     let isAuthReady = false;
     let canUseFirestore = true; 
-
-    // Your web app's Firebase configuration
-    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-    const firebaseConfig = {
-        apiKey: "AIzaSyDX2gZUs1G4hwJIsG57zSgQfu3dCTRMPDs",
-        authDomain: "natal-em-familia.firebaseapp.com",
-        projectId: "natal-em-familia",
-        storageBucket: "natal-em-familia.firebasestorage.app",
-        messagingSenderId: "632346896920",
-        appId: "1:632346896920:web:85c864f931c94c3e66b16d",
-        measurementId: "G-XZ703RD9DC"
-        };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-    
-    // Caminho da coleção pública para a lista de Natal
-    const COLLECTION_PATH = `artifacts/${appId}/public/data/natal_list`;
     
     // Define a ordem e as notas especiais para as categorias
     const CATEGORIES_INFO = [
@@ -149,7 +147,7 @@ const analytics = getAnalytics(app);
         { name: "Frutas", note: "Essa é para os machos alfas da família. 😏" },
     ];
 
-    // Itens Iniciais da Lista (Usado como fallback estático)
+    // Itens Iniciais da Lista (Usado como fallback estático e para inicializar o BD)
     const INITIAL_ITEMS = [
         // Comida Principal
         { name: "Bolinho de Bacalhau", category: "Comida Principal", takenBy: null },
@@ -194,6 +192,35 @@ const analytics = getAnalytics(app);
     ];
 
     /**
+     * Exibe uma mensagem flutuante (toast) na tela.
+     * @param {string} message A mensagem a ser exibida.
+     * @param {string} type O tipo de mensagem ('success', 'error', 'warning').
+     */
+    function showMessage(message, type = 'warning') {
+        const messageEl = document.getElementById('floating-message');
+        
+        // Determina a cor de fundo com base no tipo
+        let bgColor;
+        if (type === 'error') {
+            bgColor = 'bg-red-600';
+        } else if (type === 'success') {
+            bgColor = 'bg-green-600';
+        } else {
+            bgColor = 'bg-yellow-600'; // Default para warning
+        }
+        
+        messageEl.textContent = message;
+        messageEl.className = `fixed bottom-5 right-5 z-50 p-4 rounded-lg text-white shadow-xl transition-all duration-300 ${bgColor} opacity-100 transform translate-y-0 pointer-events-auto`;
+
+        // Oculta a mensagem após 4 segundos
+        setTimeout(() => {
+            messageEl.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+            messageEl.classList.add('opacity-0', 'translate-y-full', 'pointer-events-none');
+        }, 4000);
+    }
+
+
+    /**
      * Carrega o nome do usuário do Local Storage.
      * @returns {string} Nome do usuário ou string vazia.
      */
@@ -210,7 +237,7 @@ const analytics = getAnalytics(app);
     }
     
     /**
-     * Exibe a mensagem de erro crítico (BD Offline).
+     * Exibe a mensagem de erro crítico (BD Offline/Auth Falhou).
      * @param {string} message A mensagem de erro específica.
      */
     function showCriticalError(message) {
@@ -218,6 +245,10 @@ const analytics = getAnalytics(app);
         document.getElementById('loading-indicator').classList.add('hidden');
         document.getElementById('item-list-container').classList.add('hidden');
         
+        authStatusEl.textContent = "ERRO: Conexão Falhou";
+        authStatusEl.classList.remove('text-red-900');
+        authStatusEl.classList.add('text-red-700', 'font-bold');
+
         const errorDiv = document.getElementById('critical-error-message');
         document.getElementById('critical-error-text').textContent = message;
         errorDiv.classList.remove('hidden');
@@ -227,14 +258,14 @@ const analytics = getAnalytics(app);
     }
 
     // --- 1. Inicialização do Firebase e Autenticação ---
+    
+    // Inicia o Firebase com a configuração fornecida
     try {
-        // Verifica se a configuração está ausente (Causa raiz do BD Offline)
-        if (Object.keys(firebaseConfig).length === 0) {
-            showCriticalError("O ambiente de desenvolvimento não injetou as configurações do Firebase. As reservas não serão salvas globalmente. Por favor, clique no botão abaixo.");
-            throw new Error("Configurações do Firebase ausentes.");
+        if (!firebaseConfig) {
+             throw new Error("A configuração do Firebase não está disponível para iniciar.");
         }
         
-        // Se as configurações existirem, inicia o Firebase
+        // Inicializa o app Firebase com a configuração do ambiente
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
@@ -247,7 +278,13 @@ const analytics = getAnalytics(app);
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 userId = user.uid;
-                document.getElementById('user-id-display').textContent = userId;
+                userIdEl.textContent = userId;
+                userIdEl.classList.remove('hidden');
+                
+                authStatusEl.textContent = "Conectado. ID: " + userId.substring(0, 8) + '...';
+                authStatusEl.classList.remove('text-red-900');
+                authStatusEl.classList.add('text-green-700', 'font-bold');
+
                 isAuthReady = true;
                 
                 // Remove o erro se a autenticação for bem-sucedida
@@ -257,21 +294,31 @@ const analytics = getAnalytics(app);
                 await initializeList();
                 startRealtimeListener();
             } else {
-                // Se não estiver logado, tenta autenticar
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
+                // Tenta fazer login, preferencialmente com o token do ambiente, se disponível.
+                try {
+                    authStatusEl.textContent = "Autenticando...";
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (authError) {
+                    console.error("Erro ao tentar login:", authError);
+                    let errorMessage = authError.message || 'Erro desconhecido.';
+                    if (authError.code === 'auth/configuration-not-found') {
+                        errorMessage = "Erro de Configuração: Auth Anônima não habilitada.";
+                    } else if (authError.code === 'permission-denied') {
+                        errorMessage = "Permissão Negada! Verifique as Regras de Segurança.";
+                    }
+                    showCriticalError(`Falha na Autenticação: ${errorMessage}`);
                 }
             }
         });
 
     } catch (error) {
-        // Se for o erro de ausência de config, o showCriticalError já cuidou
-        if (!error.message.includes("Configurações do Firebase ausentes")) {
-             console.error("Erro ao inicializar Firebase:", error);
-             showCriticalError(`Erro ao iniciar o banco de dados. ${error.message || 'Verifique o console para detalhes.'}`);
-        }
+        // Captura qualquer erro de inicialização ou BD
+        console.error("Erro ao inicializar Firebase:", error);
+        showCriticalError(`Erro ao iniciar o banco de dados. ${error.message || 'Verifique o console para detalhes.'}`);
     }
 
     // --- 2. Lógica do Firestore ---
@@ -285,37 +332,39 @@ const analytics = getAnalytics(app);
             const querySnapshot = await getDocs(listCollectionRef);
 
             if (querySnapshot.empty) {
+                console.log("Coleção vazia, inicializando itens...");
                 const batch = writeBatch(db);
 
                 INITIAL_ITEMS.forEach(item => {
+                    // Usa o nome do item como ID do documento para fácil inicialização e referência
                     const itemDocRef = doc(db, COLLECTION_PATH, item.name);
-                    // Garante que o takenBy é um objeto nulo no início
                     batch.set(itemDocRef, { ...item, takenBy: null });
                 });
 
                 await batch.commit();
+                console.log("Inicialização concluída. Aguardando dados em tempo real.");
             }
         } catch (error) {
-            console.error("Erro ao inicializar a lista:", error);
-            showCriticalError("Falha ao inicializar a lista. Verifique as regras de segurança do Firestore.");
+            console.error("Erro ao inicializar a lista (write):", error);
+            showCriticalError(`Falha ao inicializar a lista. Verifique se a REGRA DE ESCRITA para "${COLLECTION_PATH}" está correta.`);
         }
     }
 
     // Manipulador para tirar ou liberar um item
     async function handleItemAction(itemId, action) {
         if (!canUseFirestore) {
-            alert("O banco de dados está offline. Por favor, use o botão 'Recarregar' no alerta vermelho.");
+            showMessage("O banco de dados está offline. Por favor, use o botão 'Recarregar' no alerta vermelho.", 'error');
             return;
         }
 
         if (!isAuthReady || !userId) {
-            alert("Aguarde a autenticação ser concluída.");
+            showMessage("Aguarde a autenticação ser concluída antes de interagir.", 'warning');
             return;
         }
 
         const userName = loadUserName().trim();
         if (action === 'take' && !userName) {
-            alert("Por favor, digite seu nome no campo acima antes de reservar um item.");
+            showMessage("Por favor, digite seu nome no campo acima antes de reservar um item.", 'warning');
             document.getElementById('user-name-input').focus();
             return;
         }
@@ -324,7 +373,7 @@ const analytics = getAnalytics(app);
         
         let newTakenBy;
         if (action === 'take') {
-            // Nova estrutura: objeto com ID e nome real
+            // Estrutura para salvar: objeto com ID de usuário e nome real
             newTakenBy = { id: userId, name: userName }; 
         } else {
             newTakenBy = null;
@@ -334,9 +383,15 @@ const analytics = getAnalytics(app);
             await updateDoc(itemDocRef, {
                 takenBy: newTakenBy
             });
+            showMessage(`Item ${action === 'take' ? 'reservado' : 'liberado'} com sucesso!`, 'success');
         } catch (error) {
             console.error("Erro ao atualizar o item:", error);
-            alert(`Falha ao ${action === 'take' ? 'reservar' : 'liberar'} o item. O item pode já ter sido reservado.`);
+            // Mensagem de erro mais útil se for um problema de permissão na escrita
+            if (error.code === 'permission-denied') {
+                 showMessage("Falha: Permissão Negada. Verifique as regras de segurança.", 'error');
+            } else {
+                showMessage(`Falha ao ${action === 'take' ? 'reservar' : 'liberar'} o item. Tente novamente.`, 'error');
+            }
         }
     }
 
@@ -390,10 +445,10 @@ const analytics = getAnalytics(app);
 
             // Ordena os itens dentro da categoria: Disponíveis primeiro
             categoryItems.sort((a, b) => {
-                const aTaken = a.takenBy !== null;
-                const bTaken = b.takenBy !== null;
+                const aTaken = a.takenBy !== null && a.takenBy.id;
+                const bTaken = b.takenBy !== null && b.takenBy.id;
                 if (aTaken === bTaken) return 0;
-                return aTaken ? 1 : -1; 
+                return aTaken ? 1 : -1; // Itens reservados (true) vão para o final
             });
 
 
@@ -484,14 +539,19 @@ const analytics = getAnalytics(app);
             renderList(items);
 
         }, (error) => {
-            console.error("Erro ao ouvir a coleção em tempo real:", error);
-            showCriticalError("Erro na sincronização. Os dados não estão atualizando. Tente recarregar.");
+            console.error("Erro ao ouvir a coleção em tempo real (read):", error);
+            let errorMessage = error.message || 'Erro desconhecido na leitura.';
+            if (error.code === 'permission-denied') {
+                 errorMessage = `Falha de Permissão (READ). Verifique se a REGRA DE LEITURA para "${COLLECTION_PATH}" está correta.`;
+            }
+            showCriticalError(`Erro na sincronização de dados. ${errorMessage}`);
         });
     }
 
     // Adiciona as funções ao escopo global para o HTML
     window.handleItemAction = handleItemAction;
     window.saveUserName = saveUserName;
+    window.showMessage = showMessage; 
 </script>
 </body>
 </html>
