@@ -90,13 +90,7 @@
     <!-- Message content goes here -->
 </div>
 
-<!-- Firebase SDKs -->
-<script type="module">
-    // Importações necessárias do Firebase
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, onSnapshot, collection, writeBatch, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
+    <script type="module">
     // Define a chave de armazenamento local para o nome do usuário
     const LOCAL_STORAGE_KEY_NAME = 'natalUserName';
 
@@ -104,40 +98,32 @@
     document.getElementById('item-list-container').classList.add('hidden');
     
     // ===================================================================================
-    // === CONFIGURAÇÕES DO FIREBASE (FORNECIDAS PELO AMBIENTE) ===
+    // === 🚨 CONFIGURAÇÃO DO JSON BIN (CORRETO E PREENCHIDO) 🚨 ===
     // ===================================================================================
-    let firebaseConfig;
-    let initialAuthToken;
-    let appId = 'default-app-id'; 
+    
+    // 1. O ID do Bin que você criou no JSONBin.io (USANDO SEU VALOR)
+    const JSONBIN_ID = "6928d58ad0ea881f40047638"; 
+    
+    // 2. A Chave Secreta (Secret Key) do JSON Bin (USANDO SEU VALOR)
+    const JSONBIN_SECRET_KEY = "$2a$10$P8HVFTfYzFrxOgpnMAA65eZGQqp9f.I88mqlvHhEMuyBKSU4wKhl2"; 
 
+    // URL da API para leitura/escrita (Montada automaticamente)
+    const BASE_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
+    
+    // A chave interna do seu objeto JSON
+    const COLLECTION_NAME = "list_items"; 
+    // ===================================================================================
+
+    // Variáveis de estado
+    let currentData = { list_items: [] }; 
+    let canUseStorage = true; // Flag para saber se podemos interagir com o BD
+    
+    // Substitui o ID de usuário do Firebase Auth por um ID anônimo no Local Storage
+    let userId = localStorage.getItem('natalAnonId') || crypto.randomUUID();
+    localStorage.setItem('natalAnonId', userId);
+    
     const authStatusEl = document.getElementById('auth-status-display');
     const userIdEl = document.getElementById('user-id-display');
-
-    try {
-        firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        appId = typeof __app_id !== 'undefined' ? __app_id : appId; 
-
-        if (Object.keys(firebaseConfig).length === 0) {
-             throw new Error("A configuração do Firebase não foi fornecida pelo ambiente.");
-        }
-    } catch (e) {
-        console.error("Erro ao carregar a configuração do Firebase:", e);
-        showCriticalError(`Erro de inicialização: ${e.message}. Verifique a configuração base.`);
-    }
-    
-    // Nome da coleção no Firestore. 
-    const COLLECTION_BASE_NAME = `natal_list_items`;
-    const COLLECTION_PATH = `artifacts/${appId}/public/data/${COLLECTION_BASE_NAME}`;
-    // ===================================================================================
-    
-    // Variáveis de inicialização do Firebase e estado
-    let app;
-    let db;
-    let auth;
-    let userId = 'static-user'; 
-    let isAuthReady = false;
-    let canUseFirestore = true; 
     
     // Define a ordem e as notas especiais para as categorias
     const CATEGORIES_INFO = [
@@ -146,8 +132,8 @@
         { name: "Sobremesas", note: "Essa é só para os solteirões. 😏" },
         { name: "Frutas", note: "Essa é para os machos alfas da família. 😏" },
     ];
-
-    // Itens Iniciais da Lista (Usado como fallback estático e para inicializar o BD)
+    
+    // Itens Iniciais da Lista (Usado como fallback estático)
     const INITIAL_ITEMS = [
         // Comida Principal
         { name: "Bolinho de Bacalhau", category: "Comida Principal", takenBy: null },
@@ -191,60 +177,41 @@
         { name: "Melão", category: "Frutas", takenBy: null },
     ];
 
-    /**
-     * Exibe uma mensagem flutuante (toast) na tela.
-     * @param {string} message A mensagem a ser exibida.
-     * @param {string} type O tipo de mensagem ('success', 'error', 'warning').
-     */
+
+    // --- Funções de Utilitário ---
+    
     function showMessage(message, type = 'warning') {
         const messageEl = document.getElementById('floating-message');
-        
-        // Determina a cor de fundo com base no tipo
         let bgColor;
         if (type === 'error') {
             bgColor = 'bg-red-600';
         } else if (type === 'success') {
             bgColor = 'bg-green-600';
         } else {
-            bgColor = 'bg-yellow-600'; // Default para warning
+            bgColor = 'bg-yellow-600';
         }
-        
         messageEl.textContent = message;
         messageEl.className = `fixed bottom-5 right-5 z-50 p-4 rounded-lg text-white shadow-xl transition-all duration-300 ${bgColor} opacity-100 transform translate-y-0 pointer-events-auto`;
-
-        // Oculta a mensagem após 4 segundos
         setTimeout(() => {
             messageEl.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
             messageEl.classList.add('opacity-0', 'translate-y-full', 'pointer-events-none');
         }, 4000);
     }
 
-
-    /**
-     * Carrega o nome do usuário do Local Storage.
-     * @returns {string} Nome do usuário ou string vazia.
-     */
     function loadUserName() {
         return localStorage.getItem(LOCAL_STORAGE_KEY_NAME) || '';
     }
 
-    /**
-     * Salva o nome do usuário no Local Storage.
-     * @param {string} name Nome do usuário.
-     */
     function saveUserName(name) {
         localStorage.setItem(LOCAL_STORAGE_KEY_NAME, name);
     }
     
-    /**
-     * Exibe a mensagem de erro crítico (BD Offline/Auth Falhou).
-     * @param {string} message A mensagem de erro específica.
-     */
     function showCriticalError(message) {
-        canUseFirestore = false;
+        canUseStorage = false;
         document.getElementById('loading-indicator').classList.add('hidden');
         document.getElementById('item-list-container').classList.add('hidden');
         
+        // Atualiza o status de conexão para ERRO
         authStatusEl.textContent = "ERRO: Conexão Falhou";
         authStatusEl.classList.remove('text-red-900');
         authStatusEl.classList.add('text-red-700', 'font-bold');
@@ -253,112 +220,95 @@
         document.getElementById('critical-error-text').textContent = message;
         errorDiv.classList.remove('hidden');
         
-        // Renderiza a lista estática para que o usuário veja algo
+        // Renderiza a lista estática como fallback
         renderList(INITIAL_ITEMS); 
     }
 
-    // --- 1. Inicialização do Firebase e Autenticação ---
-    
-    // Inicia o Firebase com a configuração fornecida
-    try {
-        if (!firebaseConfig) {
-             throw new Error("A configuração do Firebase não está disponível para iniciar.");
-        }
-        
-        // Inicializa o app Firebase com a configuração do ambiente
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        
-        // Carrega o nome do usuário e preenche o input
-        const userNameInput = document.getElementById('user-name-input');
-        userNameInput.value = loadUserName();
+    // --- Funções de API JSON Bin ---
 
-        // Observa o estado de autenticação
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                userId = user.uid;
-                userIdEl.textContent = userId;
-                userIdEl.classList.remove('hidden');
-                
-                authStatusEl.textContent = "Conectado. ID: " + userId.substring(0, 8) + '...';
-                authStatusEl.classList.remove('text-red-900');
-                authStatusEl.classList.add('text-green-700', 'font-bold');
-
-                isAuthReady = true;
-                
-                // Remove o erro se a autenticação for bem-sucedida
-                document.getElementById('critical-error-message').classList.add('hidden');
-
-                // Após a autenticação, inicializamos a lista se necessário e começamos a ouvir
-                await initializeList();
-                startRealtimeListener();
-            } else {
-                // Tenta fazer login, preferencialmente com o token do ambiente, se disponível.
-                try {
-                    authStatusEl.textContent = "Autenticando...";
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (authError) {
-                    console.error("Erro ao tentar login:", authError);
-                    let errorMessage = authError.message || 'Erro desconhecido.';
-                    if (authError.code === 'auth/configuration-not-found') {
-                        errorMessage = "Erro de Configuração: Auth Anônima não habilitada.";
-                    } else if (authError.code === 'permission-denied') {
-                        errorMessage = "Permissão Negada! Verifique as Regras de Segurança.";
-                    }
-                    showCriticalError(`Falha na Autenticação: ${errorMessage}`);
+    /**
+     * Tenta buscar os dados do JSON Bin (Leitura).
+     */
+    async function fetchData() {
+        try {
+            document.getElementById('loading-indicator').classList.remove('hidden');
+            const response = await fetch(BASE_URL + '/latest', {
+                method: 'GET',
+                headers: {
+                    'X-Master-Key': JSONBIN_SECRET_KEY,
+                    'X-Bin-Meta': false // Não traz meta-dados, só o conteúdo
                 }
-            }
-        });
+            });
 
-    } catch (error) {
-        // Captura qualquer erro de inicialização ou BD
-        console.error("Erro ao inicializar Firebase:", error);
-        showCriticalError(`Erro ao iniciar o banco de dados. ${error.message || 'Verifique o console para detalhes.'}`);
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({ message: response.statusText }));
+                throw new Error(`Erro ${response.status}: ${errorBody.message || response.statusText}`);
+            }
+
+            const data = await response.json();
+            // Acessa o array dentro do objeto JSON (list_items)
+            currentData.list_items = data[COLLECTION_NAME] || []; 
+            renderList(currentData.list_items);
+            
+            // Atualiza o Status de Conexão
+            authStatusEl.textContent = "Conectado (JSON Bin).";
+            userIdEl.textContent = 'ID Local: ' + userId.substring(0, 8) + '...';
+            userIdEl.classList.remove('hidden');
+            authStatusEl.classList.remove('text-red-900');
+            authStatusEl.classList.add('text-green-700', 'font-bold');
+            document.getElementById('critical-error-message').classList.add('hidden');
+            
+        } catch (error) {
+            console.error("Erro ao carregar dados do JSON Bin:", error);
+            showCriticalError(`Falha ao carregar lista. Verifique o JSONBIN_ID ou a SECRET_KEY. Detalhe: ${error.message}`);
+        } finally {
+             document.getElementById('loading-indicator').classList.add('hidden');
+             document.getElementById('item-list-container').classList.remove('hidden');
+        }
     }
 
-    // --- 2. Lógica do Firestore ---
+    /**
+     * Salva o array de itens completo de volta no JSON Bin (Escrita).
+     */
+    async function saveState(newItems) {
+        if (!canUseStorage) return;
 
-    // Inicializa a lista se ela estiver vazia no banco de dados
-    async function initializeList() {
-        if (!isAuthReady || !canUseFirestore) return;
+        // Monta o objeto que será salvo (o Bin completo)
+        const updatedBin = {
+            [COLLECTION_NAME]: newItems 
+        };
 
         try {
-            const listCollectionRef = collection(db, COLLECTION_PATH);
-            const querySnapshot = await getDocs(listCollectionRef);
+            const response = await fetch(BASE_URL, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': JSONBIN_SECRET_KEY,
+                },
+                body: JSON.stringify(updatedBin)
+            });
 
-            if (querySnapshot.empty) {
-                console.log("Coleção vazia, inicializando itens...");
-                const batch = writeBatch(db);
-
-                INITIAL_ITEMS.forEach(item => {
-                    // Usa o nome do item como ID do documento para fácil inicialização e referência
-                    const itemDocRef = doc(db, COLLECTION_PATH, item.name);
-                    batch.set(itemDocRef, { ...item, takenBy: null });
-                });
-
-                await batch.commit();
-                console.log("Inicialização concluída. Aguardando dados em tempo real.");
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({ message: response.statusText }));
+                throw new Error(`Erro ${response.status}: ${errorBody.message || response.statusText}`);
             }
+            
+            showMessage('Item atualizado com sucesso!', 'success');
+            // Força a leitura para atualizar a lista imediatamente em todos os navegadores
+            await fetchData(); 
+
         } catch (error) {
-            console.error("Erro ao inicializar a lista (write):", error);
-            showCriticalError(`Falha ao inicializar a lista. Verifique se a REGRA DE ESCRITA para "${COLLECTION_PATH}" está correta.`);
+            console.error("Erro ao salvar dados no JSON Bin:", error);
+            showMessage(`Falha ao salvar o item. ${error.message}`, 'error');
+            fetchData();
         }
     }
 
-    // Manipulador para tirar ou liberar um item
+    // --- Lógica de Ação ---
+    
     async function handleItemAction(itemId, action) {
-        if (!canUseFirestore) {
-            showMessage("O banco de dados está offline. Por favor, use o botão 'Recarregar' no alerta vermelho.", 'error');
-            return;
-        }
-
-        if (!isAuthReady || !userId) {
-            showMessage("Aguarde a autenticação ser concluída antes de interagir.", 'warning');
+        if (!canUseStorage) {
+            showMessage("O banco de dados está offline. Por favor, use o botão 'Recarregar'.", 'error');
             return;
         }
 
@@ -368,54 +318,42 @@
             document.getElementById('user-name-input').focus();
             return;
         }
-
-        const itemDocRef = doc(db, COLLECTION_PATH, itemId);
         
+        const itemIndex = currentData.list_items.findIndex(item => item.name === itemId);
+        if (itemIndex === -1) {
+            showMessage("Item não encontrado na lista atualizada.", 'error');
+            return;
+        }
+
         let newTakenBy;
         if (action === 'take') {
-            // Estrutura para salvar: objeto com ID de usuário e nome real
-            newTakenBy = { id: userId, name: userName }; 
+            newTakenBy = { id: userId, name: userName };
         } else {
             newTakenBy = null;
         }
+
+        const newItems = [...currentData.list_items];
+        newItems[itemIndex].takenBy = newTakenBy;
         
-        try {
-            await updateDoc(itemDocRef, {
-                takenBy: newTakenBy
-            });
-            showMessage(`Item ${action === 'take' ? 'reservado' : 'liberado'} com sucesso!`, 'success');
-        } catch (error) {
-            console.error("Erro ao atualizar o item:", error);
-            // Mensagem de erro mais útil se for um problema de permissão na escrita
-            if (error.code === 'permission-denied') {
-                 showMessage("Falha: Permissão Negada. Verifique as regras de segurança.", 'error');
-            } else {
-                showMessage(`Falha ao ${action === 'take' ? 'reservar' : 'liberar'} o item. Tente novamente.`, 'error');
-            }
-        }
+        await saveState(newItems);
     }
-
-    // --- 3. Renderização e Sincronização em Tempo Real ---
-
-    // Renderiza a lista no DOM
+    
+    // --- Renderização (Mantida) ---
     function renderList(items) {
         const listContainer = document.getElementById('item-list-container');
         listContainer.innerHTML = ''; 
         
-        const currentUserId = userId; // O ID de quem está vendo a tela
+        const currentUserId = userId; 
 
-        // 1. Agrupa os itens por categoria
         const groupedItems = items.reduce((acc, item) => {
             const category = item.category || 'Outros'; 
             if (!acc[category]) {
                 acc[category] = [];
             }
-            // Adiciona o ID do documento, que é o nome do item
             acc[category].push({ id: item.name, ...item });
             return acc;
         }, {});
 
-        // 2. Itera sobre a ordem das categorias para renderizar
         CATEGORIES_INFO.forEach(categoryInfo => {
             const categoryName = categoryInfo.name;
             const categoryNote = categoryInfo.note;
@@ -433,7 +371,6 @@
 
             titleDiv.appendChild(titleH2);
             
-            // Nota Especial (se existir)
             if (categoryNote) {
                 const noteP = document.createElement('p');
                 noteP.className = 'text-sm italic font-medium text-red-600';
@@ -443,20 +380,17 @@
             
             listContainer.appendChild(titleDiv);
 
-            // Ordena os itens dentro da categoria: Disponíveis primeiro
+            // Ordena os itens
             categoryItems.sort((a, b) => {
                 const aTaken = a.takenBy !== null && a.takenBy.id;
                 const bTaken = b.takenBy !== null && b.takenBy.id;
                 if (aTaken === bTaken) return 0;
-                return aTaken ? 1 : -1; // Itens reservados (true) vão para o final
+                return aTaken ? 1 : -1;
             });
 
-
-            // Renderiza os itens da categoria
             categoryItems.forEach(item => {
                 const itemId = item.id;
                 
-                // Adaptação para a nova estrutura de takenBy
                 const isTaken = item.takenBy !== null && typeof item.takenBy === 'object' && item.takenBy.id;
                 const takerId = isTaken ? item.takenBy.id : null;
                 const takerName = isTaken ? item.takenBy.name : null;
@@ -479,7 +413,7 @@
                 statusEl.className = `text-sm mt-0.5 ${isTaken ? 'text-green-800' : 'text-red-600'}`;
                 
                 if (isTaken) {
-                     statusEl.innerHTML = `Reservado por: <span class="font-mono font-bold">${takenByDisplay}</span>`;
+                    statusEl.innerHTML = `Reservado por: <span class="font-mono font-bold">${takenByDisplay}</span>`;
                 } else {
                     statusEl.textContent = 'Disponível';
                 }
@@ -492,23 +426,19 @@
                 const actionButton = document.createElement('button');
                 actionButton.className = 'w-full sm:w-auto px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 transform';
                 
-                if (!canUseFirestore) {
-                    // MODO ESTÁTICO DE EMERGÊNCIA
+                if (!canUseStorage) {
                     actionButton.textContent = 'BD Offline';
                     actionButton.className += ' bg-gray-400 text-gray-700 cursor-not-allowed';
                     actionButton.disabled = true;
                 } else if (isMine) {
-                    // Botão para liberar o item (se foi tirado por mim)
                     actionButton.textContent = 'Liberar';
                     actionButton.className += ' bg-yellow-600 text-white hover:bg-yellow-700 focus:outline-none focus:ring-4 focus:ring-yellow-300 hover:scale-105';
                     actionButton.onclick = () => handleItemAction(itemId, 'release');
                 } else if (isTaken) {
-                    // Item tirado por outra pessoa - desabilitado
                     actionButton.textContent = 'Reservado';
                     actionButton.className += ' bg-gray-400 text-gray-700 cursor-not-allowed';
                     actionButton.disabled = true;
                 } else {
-                    // Item disponível - botão para tirar
                     actionButton.textContent = 'Eu Levo!';
                     actionButton.className += ' bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 hover:scale-105';
                     actionButton.onclick = () => handleItemAction(itemId, 'take');
@@ -523,35 +453,14 @@
         document.getElementById('item-list-container').classList.remove('hidden');
     }
 
-    // Inicia o ouvinte em tempo real do Firestore
-    function startRealtimeListener() {
-        if (!isAuthReady || !canUseFirestore) return;
 
-        const listCollectionRef = collection(db, COLLECTION_PATH);
-        
-        // onSnapshot nos dá a atualização em tempo real
-        onSnapshot(listCollectionRef, (snapshot) => {
-            const items = [];
-            snapshot.forEach((doc) => {
-                items.push({ name: doc.id, ...doc.data() });
-            });
-            
-            renderList(items);
-
-        }, (error) => {
-            console.error("Erro ao ouvir a coleção em tempo real (read):", error);
-            let errorMessage = error.message || 'Erro desconhecido na leitura.';
-            if (error.code === 'permission-denied') {
-                 errorMessage = `Falha de Permissão (READ). Verifique se a REGRA DE LEITURA para "${COLLECTION_PATH}" está correta.`;
-            }
-            showCriticalError(`Erro na sincronização de dados. ${errorMessage}`);
-        });
-    }
-
+    // --- Chamada Inicial ---
+    fetchData(); // Inicia a carga e renderização da lista
+    
     // Adiciona as funções ao escopo global para o HTML
     window.handleItemAction = handleItemAction;
     window.saveUserName = saveUserName;
-    window.showMessage = showMessage; 
+    window.showMessage = showMessage;
 </script>
 </body>
 </html>
