@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lista de Contribuição de Natal Colaborativa</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -43,7 +42,6 @@
 <div class="min-h-screen p-4 sm:p-8 flex items-center justify-center">
     <div class="w-full max-w-4xl container-bg p-6 sm:p-8 lg:p-10">
         
-        <!-- Cabeçalho -->
         <header class="header-bg p-6 rounded-t-xl mb-6 -mx-6 -mt-6 sm:-mx-8 sm:-mt-8 lg:-mx-10 lg:-mt-10">
             <h1 class="text-3xl font-bold text-center">🎄 Natal da Família Amorim 🎄</h1>
             <p class="text-center mt-2 opacity-90">Escolha o que você vai levar!</p>
@@ -51,25 +49,21 @@
             <p class="text-center mt-2 opacity-90">Homens e solteirões vcs tem os topicos de vcs (Frutas e sobremesas)</p>
         </header>
         
-        <!-- Painel de Erro CRÍTICO (BD Offline) -->
         <div id="critical-error-message" class="mt-6 p-4 hidden bg-red-100 border-2 border-red-500 text-red-700 rounded-lg mb-6" role="alert">
             <p class="font-bold text-red-900">ERRO CRÍTICO: BANCO DE DADOS OFFLINE</p>
             <p id="critical-error-text" class="text-sm mt-1">Detalhe: Ocorreu um erro na conexão. Tente recarregar ou verifique as regras de segurança do Firestore.</p>
-            <!-- Botão de Recarga Forçada -->
             <button onclick="window.location.reload(true)" 
                     class="mt-4 px-6 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition duration-150 shadow-md">
                 Tentar Recarregar e Forçar a Conexão
             </button>
         </div>
 
-        <!-- Informações e Input de Nome do Usuário -->
         <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between">
             <div class="flex-grow mb-2 sm:mb-0">
                 <p class="text-sm font-medium text-red-800">1. Digite seu nome (usado na reserva):</p>
-                <!-- Usamos localStorage para lembrar o nome apenas neste navegador -->
                 <input id="user-name-input" type="text" placeholder="Seu Nome (ex: Maria)"
                        class="p-2 border border-red-300 rounded-lg w-full sm:w-64 mt-1 text-red-900 focus:ring-red-500 focus:border-red-500"
-                       oninput="saveUserName(this.value)">
+                       onblur="saveUserName(this.value)">
             </div>
             <div class="mt-3 sm:mt-0 sm:ml-4">
                 <p class="text-sm font-medium text-red-800">2. Status da Conexão:</p>
@@ -78,19 +72,15 @@
             </div>
         </div>
 
-        <!-- Lista de Itens -->
         <div id="loading-indicator" class="text-center py-8 text-gray-500 font-semibold text-xl">Carregando a lista...</div>
         <div id="item-list-container" class="scroll-container space-y-3 hidden">
-            <!-- Os itens serão injetados aqui pelo JavaScript -->
-        </div>
+            </div>
 
     </div>
 </div>
 
-<!-- Painel de Mensagens Flutuantes (Toast-like) -->
 <div id="floating-message" class="fixed bottom-5 right-5 z-50 p-4 rounded-lg text-white shadow-xl transition-all duration-300 opacity-0 transform translate-y-full pointer-events-none" role="alert">
-    <!-- Message content goes here -->
-</div>
+    </div>
 
     <script type="module">
     // Define a chave de armazenamento local para o nome do usuário
@@ -136,68 +126,67 @@
         { name: "Frutas", note: "Só para as donas da casa." },
     ];
     
-    // Itens Iniciais da Lista (Usado como fallback estático)
+    // Itens Iniciais da Lista (USANDO ID ÚNICO AGORA para maior confiabilidade)
     const INITIAL_ITEMS = [
         //Proteínas
+        { id: "prot_chester_g_1", name: "Chester Assado + 1 pc de pratinho(g)", category: "Proteínas", takenBy: null },
+        { id: "prot_chester_p_1", name: "Chester Assado + 1 pc de pratinho(p)", category: "Proteínas", takenBy: null },
+        { id: "prot_chester_g_2", name: "Chester Assado + 1 pc de pratinho(g)", category: "Proteínas", takenBy: null },
+        { id: "prot_chester_p_2", name: "Chester Assado + 1 pc de pratinho (p)", category: "Proteínas", takenBy: null },
+        { id: "prot_pernil_p", name: "Pernil + 1 pc de pratinho (p)", category: "Proteínas", takenBy: null },
+        { id: "prot_kibe_g", name: "Kibe de forno + 1 pc de pratinho (g)", category: "Proteínas", takenBy: null },
+        { id: "prot_kibe_p", name: "Kibe de forno 1 pc de pratinho (p)", category: "Proteínas", takenBy: null },
+        // CORRIGIDO: Categoria Lombo era 'Proteina', agora é 'Proteínas'
+        { id: "prot_lombo", name: "Lombo suino recheado + 1 pc de pratinho (p)", category: "Proteínas", takenBy: null },
 
-        { name: "Chester Assado + 1 pc de pratinho(g)", category: "Proteínas", takenBy: null },
-        { name: "Chester Assado + 1 pc de pratinho(p)", category: "Proteínas", takenBy: null },
-        { name: "Chester Assado + 1 pc de pratinho(g)", category: "Proteínas", takenBy: null },
-        { name: "Chester Assado + 1 pc de pratinho (p)", category: "Proteínas", takenBy: null },
-        { name: "Pernil + 1 pc de pratinho (p)", category: "Proteínas", takenBy: null },
-        { name: "Kibe de forno + 1 pc de pratinho (g)", category: "Proteínas", takenBy: null },
-        { name: "Kibe de forno 1 pc de pratinho (p)", category: "Proteínas", takenBy: null },
-        { name: "Lombo suino recheado + 1 pc de pratinho (p)", category: "Proteinas", takenBy: null },
-
-         //Acompanhamentos
-
-        { name: "Bolinho de Bacalhau", category: "Acompanhamentos", takenBy: null },
-        { name: "Salada de Bacalhau", category: "Acompanhamentos", takenBy: null },
-        { name: "Farofa + salada tropical", category: "Acompanhamentos", takenBy: null },
-        { name: "Arroz à Grega + 50 pastéis de frango", category: "Acompanhamentos", takenBy: null },
-        { name: "Arroz à Grega + 50 pastéis de carne", category: "Acompanhamentos", takenBy: null },
-        { name: "Salpicão", category: "Acompanhamentos", takenBy: null },
-        { name: "Salpicão", category: "Acompanhamentos", takenBy: null },
-        { name: "Empadão + 50 Pasteis de queijo", category: "Acompanhamentos", takenBy: null },
+        //Acompanhamentos
+        { id: "acomp_bolinho_bac", name: "Bolinho de Bacalhau", category: "Acompanhamentos", takenBy: null },
+        { id: "acomp_salada_bac", name: "Salada de Bacalhau", category: "Acompanhamentos", takenBy: null },
+        { id: "acomp_farofa", name: "Farofa + salada tropical", category: "Acompanhamentos", takenBy: null },
+        { id: "acomp_arroz_grega_frango", name: "Arroz à Grega + 50 pastéis de frango", category: "Acompanhamentos", takenBy: null },
+        { id: "acomp_arroz_grega_carne", name: "Arroz à Grega + 50 pastéis de carne", category: "Acompanhamentos", takenBy: null },
+        { id: "acomp_salpicao_1", name: "Salpicão", category: "Acompanhamentos", takenBy: null },
+        { id: "acomp_salpicao_2", name: "Salpicão", category: "Acompanhamentos", takenBy: null },
+        { id: "acomp_empadao", name: "Empadão + 50 Pasteis de queijo", category: "Acompanhamentos", takenBy: null },
 
         // Bebidas
-        { name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
-        { name: "Refrigerante Fanta Uva", category: "Bebidas", takenBy: null },
-        { name: "Refrigerante Fanta Laranja", category: "Bebidas", takenBy: null },
-        { name: "Refrigerante Sprit", category: "Bebidas", takenBy: null },
-        { name: "Refrigerante Guaraná Antartica", category: "Bebidas", takenBy: null },
-        { name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
-        { name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
-        { name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
-        { name: "Cerveja Heineken", category: "Bebidas", takenBy: null },
-        { name: "Cerveja Heineken", category: "Bebidas", takenBy: null },
-        { name: "Cerveja Brahma", category: "Bebidas", takenBy: null },
-        { name: "Cerveja Brahma", category: "Bebidas", takenBy: null },
-        { name: "Cerveja Budweiser", category: "Bebidas", takenBy: null },
-        { name: "Cerveja Budweiser", category: "Bebidas", takenBy: null },        
-        { name: "Sucos Variados", category: "Bebidas", takenBy: null },
-        { name: "Sucos Variados", category: "Bebidas", takenBy: null },
-        { name: "Sucos Variados", category: "Bebidas", takenBy: null },
+        { id: "beb_coca_1", name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
+        { id: "beb_fanta_uva", name: "Refrigerante Fanta Uva", category: "Bebidas", takenBy: null },
+        { id: "beb_fanta_laranja", name: "Refrigerante Fanta Laranja", category: "Bebidas", takenBy: null },
+        { id: "beb_sprite", name: "Refrigerante Sprit", category: "Bebidas", takenBy: null },
+        { id: "beb_guarana", name: "Refrigerante Guaraná Antartica", category: "Bebidas", takenBy: null },
+        { id: "beb_coca_2", name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
+        { id: "beb_coca_3", name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
+        { id: "beb_coca_4", name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
+        { id: "beb_heineken_1", name: "Cerveja Heineken", category: "Bebidas", takenBy: null },
+        { id: "beb_heineken_2", name: "Cerveja Heineken", category: "Bebidas", takenBy: null },
+        { id: "beb_brahma_1", name: "Cerveja Brahma", category: "Bebidas", takenBy: null },
+        { id: "beb_brahma_2", name: "Cerveja Brahma", category: "Bebidas", takenBy: null },
+        { id: "beb_budweiser_1", name: "Cerveja Budweiser", category: "Bebidas", takenBy: null },
+        { id: "beb_budweiser_2", name: "Cerveja Budweiser", category: "Bebidas", takenBy: null },     
+        { id: "beb_sucos_1", name: "Sucos Variados", category: "Bebidas", takenBy: null },
+        { id: "beb_sucos_2", name: "Sucos Variados", category: "Bebidas", takenBy: null },
+        { id: "beb_sucos_3", name: "Sucos Variados", category: "Bebidas", takenBy: null },
 
         // Sobremesas
-        { name: "Guirlanda de Brownie + 1 pc de colherzinha", category: "Sobremesas", takenBy: null },
-        { name: "Bolo de Natal + 1 pc de garfinho", category: "Sobremesas", takenBy: null },
-        { name: "Manjar + 1 pc de copo de 200ml", category: "Sobremesas", takenBy: null },
-        { name: "Rabanada 1º Round + 1 pc de colherzinha", category: "Sobremesas", takenBy: null },        
-        { name: "Surpresa de Morango + 1 pc de garfinho", category: "Sobremesas", takenBy: null },
-        { name: "Surpresa de Uva + 1 pc de copo 200ml", category: "Sobremesas", takenBy: null },
-        { name: "Pudim (g)", category: "Sobremesas", takenBy: null },
-        { name: "Pudim (g) = 1 pc de guardanapo", category: "Sobremesas", takenBy: null },
-        { name: "Rabanada 2º Round + 1 pc de colherzinha", category: "Sobremesas", takenBy: null },        
+        { id: "sob_brownie", name: "Guirlanda de Brownie + 1 pc de colherzinha", category: "Sobremesas", takenBy: null },
+        { id: "sob_bolo", name: "Bolo de Natal + 1 pc de garfinho", category: "Sobremesas", takenBy: null },
+        { id: "sob_manjar", name: "Manjar + 1 pc de copo de 200ml", category: "Sobremesas", takenBy: null },
+        { id: "sob_rabanada_1", name: "Rabanada 1º Round + 1 pc de colherzinha", category: "Sobremesas", takenBy: null },     
+        { id: "sob_morango", name: "Surpresa de Morango + 1 pc de garfinho", category: "Sobremesas", takenBy: null },
+        { id: "sob_uva", name: "Surpresa de Uva + 1 pc de copo 200ml", category: "Sobremesas", takenBy: null },
+        { id: "sob_pudim_g_1", name: "Pudim (g)", category: "Sobremesas", takenBy: null },
+        { id: "sob_pudim_g_2", name: "Pudim (g) = 1 pc de guardanapo", category: "Sobremesas", takenBy: null },
+        { id: "sob_rabanada_2", name: "Rabanada 2º Round + 1 pc de colherzinha", category: "Sobremesas", takenBy: null },     
         
         // Frutas
-        { name: "Uvas", category: "Frutas", takenBy: null },
-        { name: "Maçãs", category: "Frutas", takenBy: null },
-        { name: "Pêssegos", category: "Frutas", takenBy: null },
-        { name: "Ameixas", category: "Frutas", takenBy: null },
-        { name: "Abacaxi", category: "Frutas", takenBy: null },
-        { name: "Melancia", category: "Frutas", takenBy: null },
-        { name: "Melão", category: "Frutas", takenBy: null },
+        { id: "fruta_uva", name: "Uvas", category: "Frutas", takenBy: null },
+        { id: "fruta_maca", name: "Maçãs", category: "Frutas", takenBy: null },
+        { id: "fruta_pessego", name: "Pêssegos", category: "Frutas", takenBy: null },
+        { id: "fruta_ameixa", name: "Ameixas", category: "Frutas", takenBy: null },
+        { id: "fruta_abacaxi", name: "Abacaxi", category: "Frutas", takenBy: null },
+        { id: "fruta_melancia", name: "Melancia", category: "Frutas", takenBy: null },
+        { id: "fruta_melao", name: "Melão", category: "Frutas", takenBy: null },
     ];
 
 
@@ -225,8 +214,16 @@
         return localStorage.getItem(LOCAL_STORAGE_KEY_NAME) || '';
     }
 
+    // AJUSTADO: Funcao salva o nome com trim e limpa se estiver vazio
     function saveUserName(name) {
-        localStorage.setItem(LOCAL_STORAGE_KEY_NAME, name);
+        const trimmedName = name.trim();
+        if (trimmedName) {
+            localStorage.setItem(LOCAL_STORAGE_KEY_NAME, trimmedName);
+        } else {
+            localStorage.removeItem(LOCAL_STORAGE_KEY_NAME);
+        }
+        // Atualiza o valor no campo de input para refletir o trim
+        document.getElementById('user-name-input').value = trimmedName;
     }
     
     function showCriticalError(message) {
@@ -243,17 +240,20 @@
         document.getElementById('critical-error-text').textContent = message;
         errorDiv.classList.remove('hidden');
         
-        // Renderiza a lista estática como fallback
+        // Renderiza a lista estática como fallback (agora com IDs)
         renderList(INITIAL_ITEMS); 
     }
 
-    // --- Funções de API JSON Bin ---
+    // --- Funções de API JSON Bin (Não Alteradas) ---
 
     /**
      * Tenta buscar os dados do JSON Bin (Leitura).
      */
     async function fetchData() {
         try {
+            // Garante que o input de nome seja preenchido na inicialização
+            document.getElementById('user-name-input').value = loadUserName();
+
             document.getElementById('loading-indicator').classList.remove('hidden');
             const response = await fetch(BASE_URL + '/latest', {
                 method: 'GET',
@@ -327,7 +327,7 @@
         }
     }
 
-    // --- Lógica de Ação ---
+    // --- Lógica de Ação (AJUSTADA para usar ID único) ---
     
     async function handleItemAction(itemId, action) {
         if (!canUseStorage) {
@@ -342,7 +342,8 @@
             return;
         }
         
-        const itemIndex = currentData.list_items.findIndex(item => item.name === itemId);
+        // ALTERADO: Busca o item por ID (itemId) e não mais por nome (item.name)
+        const itemIndex = currentData.list_items.findIndex(item => item.id === itemId);
         if (itemIndex === -1) {
             showMessage("Item não encontrado na lista atualizada.", 'error');
             return;
@@ -361,19 +362,27 @@
         await saveState(newItems);
     }
     
-    // --- Renderização (Mantida) ---
+    // --- Renderização (AJUSTADA para usar ID único e melhorada a ordenação) ---
     function renderList(items) {
         const listContainer = document.getElementById('item-list-container');
         listContainer.innerHTML = ''; 
         
         const currentUserId = userId; 
 
-        const groupedItems = items.reduce((acc, item) => {
+        // Adiciona um ID único se estiver no modo fallback (baseado no nome), apenas para renderização.
+        // O ID real usado na ação será o que vier do BD (ou o ID estático se for fallback).
+        const itemsWithIds = items.map(item => ({
+             // Prioriza o ID se existir (veio do BD ou da lista estática), caso contrário, usa o nome como fallback para o ID.
+            id: item.id || item.name, 
+            ...item 
+        }));
+
+        const groupedItems = itemsWithIds.reduce((acc, item) => {
             const category = item.category || 'Outros'; 
             if (!acc[category]) {
                 acc[category] = [];
             }
-            acc[category].push({ id: item.name, ...item });
+            acc[category].push(item);
             return acc;
         }, {});
 
@@ -403,13 +412,24 @@
             
             listContainer.appendChild(titleDiv);
 
-            // Ordena os itens
+            // MELHORIA na ORDENAÇÃO: Disponível (1) > Reservado por Você (2) > Reservado por Outro (3)
             categoryItems.sort((a, b) => {
-                const aTaken = a.takenBy !== null && a.takenBy.id;
-                const bTaken = b.takenBy !== null && b.takenBy.id;
-                if (aTaken === bTaken) return 0;
-                return aTaken ? 1 : -1;
+                const aTakerId = a.takenBy?.id; 
+                const bTakerId = b.takenBy?.id;
+
+                const aIsMine = aTakerId === currentUserId;
+                const bIsMine = bTakerId === currentUserId;
+
+                // 1: Disponível, 2: Reservado por Mim, 3: Reservado por Outro
+                const aOrder = aTakerId ? (aIsMine ? 2 : 3) : 1;
+                const bOrder = bTakerId ? (bIsMine ? 2 : 3) : 1;
+
+                if (aOrder !== bOrder) return aOrder - bOrder;
+                
+                // Em caso de empate, ordena por nome
+                return a.name.localeCompare(b.name);
             });
+
 
             categoryItems.forEach(item => {
                 const itemId = item.id;
