@@ -129,45 +129,66 @@
     
     // Define a ordem e as notas especiais para as categorias
     const CATEGORIES_INFO = [
-        { name: "Comida Principal", note: "" },
-        { name: "Bebidas", note: "" },
+        { name: "Proteínas", note: "So para os machos alfas da familia!😏" },
+        { name: "Acompanhamentos", note: "Só para as donas da casa!" },
+        { name: "Bebidas", note: "Para todos tirarem" },
         { name: "Sobremesas", note: "Essa é só para os solteirões. 😏" },
-        { name: "Frutas", note: "Essa é para os machos alfas da família. 😏" },
+        { name: "Frutas", note: "Só para as donas da casa." },
     ];
     
     // Itens Iniciais da Lista (Usado como fallback estático)
     const INITIAL_ITEMS = [
-        // Comida Principal
-        { name: "Bolinho de Bacalhau", category: "Comida Principal", takenBy: null },
-        { name: "Salada de Bacalhau", category: "Comida Principal", takenBy: null },
-        { name: "Chester Assado + 1 pc de pratinho(g)", category: "Comida Principal", takenBy: null },
-        { name: "Farofa + salada tropical + 1 pc de pratinho(g)", category: "Comida Principal", takenBy: null },
-        { name: "Arroz à Grega + 50 pastéis de frango + 1 pc de praticnho(p)", category: "Comida Principal", takenBy: null },
-        { name: "Salpicão + 50 Pasteis de queijo + 1 pc de pratinho(p) ", category: "Comida Principal", takenBy: null },
-        { name: "Empadão + 1 pc de pratinho (p)", category: "Comida Principal", takenBy: null },
-        { name: "Chester Assado + 1 pc de pratinho (g)", category: "Comida Principal", takenBy: null },
-        { name: "Pernil + 1 pc de pratinho (p)", category: "Comida Principal", takenBy: null },
-        { name: "Kibe de forno + 50 pasteis de carne + 1 pc de pratinho (g)", category: "Comida Principal", takenBy: null },
+        //Proteínas
+
+        { name: "Chester Assado + 1 pc de pratinho(g)", category: "Proteínas", takenBy: null },
+        { name: "Chester Assado + 1 pc de pratinho(p)", category: "Proteínas", takenBy: null },
+        { name: "Chester Assado + 1 pc de pratinho(g)", category: "Proteínas", takenBy: null },
+        { name: "Chester Assado + 1 pc de pratinho (p)", category: "Proteínas", takenBy: null },
+        { name: "Pernil + 1 pc de pratinho (p)", category: "Proteínas", takenBy: null },
+        { name: "Kibe de forno + 1 pc de pratinho (g)", category: "Proteínas", takenBy: null },
+        { name: "Kibe de forno 1 pc de pratinho (p)", category: "Proteínas", takenBy: null },
+        { name: "Lombo suino recheado + 1 pc de pratinho (p)", category: "Proteina", takenBy: null },
+
+         //Acompanhamentos
+
+        { name: "Bolinho de Bacalhau", category: "Acompanhamentos", takenBy: null },
+        { name: "Salada de Bacalhau", category: "Acompanhamentos", takenBy: null },
+        { name: "Farofa + salada tropical", category: "Acompanhamentos", takenBy: null },
+        { name: "Arroz à Grega + 50 pastéis de frango", category: "Acompanhamentos", takenBy: null },
+        { name: "Arroz à Grega + 50 pastéis de carne", category: "Acompanhamentos", takenBy: null },
+        { name: "Salpicão", category: "Acompanhamentos", takenBy: null },
+        { name: "Salpicão", category: "Acompanhamentos", takenBy: null },
+        { name: "Empadão + 50 Pasteis de queijo", category: "Acompanhamentos", takenBy: null },
 
         // Bebidas
         { name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
-        { name: "Refrigernate Fanta Guaraná", category: "Bebidas", takenBy: null },
-        { name: "Refrigerante Guaraná", category: "Bebidas", takenBy: null },
-        { name: "Refrigerante Sprite", category: "Bebidas", takenBy: null },
+        { name: "Refrigerante Fanta Uva", category: "Bebidas", takenBy: null },
+        { name: "Refrigerante Fanta Laranja", category: "Bebidas", takenBy: null },
+        { name: "Refrigerante Sprit", category: "Bebidas", takenBy: null },
+        { name: "Refrigerante Guaraná Antartica", category: "Bebidas", takenBy: null },
+        { name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
+        { name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
+        { name: "Refrigerante Coca-Cola", category: "Bebidas", takenBy: null },
+        { name: "Cerveja Heineken", category: "Bebidas", takenBy: null },
         { name: "Cerveja Heineken", category: "Bebidas", takenBy: null },
         { name: "Cerveja Brahma", category: "Bebidas", takenBy: null },
+        { name: "Cerveja Brahma", category: "Bebidas", takenBy: null },
         { name: "Cerveja Budweiser", category: "Bebidas", takenBy: null },
-        { name: "Água", category: "Bebidas", takenBy: null },
+        { name: "Cerveja Budweiser", category: "Bebidas", takenBy: null },        
+        { name: "Sucos Variados", category: "Bebidas", takenBy: null },
+        { name: "Sucos Variados", category: "Bebidas", takenBy: null },
         { name: "Sucos Variados", category: "Bebidas", takenBy: null },
 
         // Sobremesas
         { name: "Guirlanda de Brownie + 1 pc de colherzinha", category: "Sobremesas", takenBy: null },
         { name: "Bolo de Natal + 1 pc de garfinho", category: "Sobremesas", takenBy: null },
         { name: "Manjar + 1 pc de copo de 200ml", category: "Sobremesas", takenBy: null },
-        { name: "Rabanada + 1 pc de colherzinha", category: "Sobremesas", takenBy: null },
-        { name: "Panetone + 1 pc de copo 200ml", category: "Sobremesas", takenBy: null },
+        { name: "Rabanada 1º Round + 1 pc de colherzinha", category: "Sobremesas", takenBy: null },        
         { name: "Surpresa de Morango + 1 pc de garfinho", category: "Sobremesas", takenBy: null },
-        { name: "Surpresa de Uva + 1 pc de guardanapo", category: "Sobremesas", takenBy: null },
+        { name: "Surpresa de Uva + 1 pc de copo 200ml", category: "Sobremesas", takenBy: null },
+        { name: "Pudim (g)", category: "Sobremesas", takenBy: null },
+        { name: "Pudim (g) = 1 pc de guardanapo", category: "Sobremesas", takenBy: null },
+        { name: "Rabanada 2º Round + 1 pc de colherzinha", category: "Sobremesas", takenBy: null },        
         
         // Frutas
         { name: "Uvas", category: "Frutas", takenBy: null },
