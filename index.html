@@ -249,6 +249,10 @@
     /**
      * Tenta buscar os dados do JSON Bin (Leitura).
      */
+   /**
+     * Tenta buscar os dados do JSON Bin (Leitura).
+     * 🚨 AGORA COM LÓGICA DE SINCRONIZAÇÃO PARA FORÇAR INITIAL_ITEMS 🚨
+     */
     async function fetchData() {
         try {
             // Garante que o input de nome seja preenchido na inicialização
@@ -270,7 +274,20 @@
 
             const data = await response.json();
             // Acessa o array dentro do objeto JSON (list_items)
-            currentData.list_items = data[COLLECTION_NAME] || []; 
+            currentData.list_items = data[COLLECTION_NAME] || [];
+            
+            // =========================================================================
+            // 🚨 CÓDIGO NOVO PARA FORÇAR A SINCRONIZAÇÃO 🚨
+            if (currentData.list_items.length < INITIAL_ITEMS.length / 2) { 
+                 console.warn("JSON Bin vazio ou desatualizado. Forçando a lista inicial.");
+                 showMessage('Lista desatualizada no servidor. Forçando a sincronização inicial...', 'warning');
+                 
+                 // Salva a lista estática completa. A função saveState chamará fetchData() novamente.
+                 await saveState(INITIAL_ITEMS); 
+                 return; // Sai do fetchData atual para evitar duplicidade.
+            }
+            // =========================================================================
+            
             renderList(currentData.list_items);
             
             // Atualiza o Status de Conexão
@@ -289,7 +306,6 @@
              document.getElementById('item-list-container').classList.remove('hidden');
         }
     }
-
     /**
      * Salva o array de itens completo de volta no JSON Bin (Escrita).
      */
